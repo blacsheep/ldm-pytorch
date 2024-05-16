@@ -20,7 +20,7 @@ def hinge_d_loss(logits_real, logits_fake):
 
 
 class VQLPIPSWithDiscriminator(nn.Module):
-    def __init__(self, disc_start=1, codebook_weight=1.0,
+    def __init__(self, disc_start=10000, codebook_weight=1.0,
                  disc_num_layers=3, disc_in_channels=3, disc_factor=1.0, disc_weight=0.6,
                  perceptual_weight=1.0, use_actnorm=False, disc_conditional=False,
                  disc_ndf=64, disc_loss="hinge"):

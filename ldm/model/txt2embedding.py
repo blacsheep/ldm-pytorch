@@ -17,7 +17,7 @@ class BERTEmbedding(torch.nn.Module):
         output = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         hiden_state = self.model(output["input_ids"].to(self.device), output["attention_mask"].to(self.device))
-        return hiden_state['pooler_output'][0]
+        return hiden_state['last_hidden_state']
 
     @torch.no_grad()
     def encode(self, text):

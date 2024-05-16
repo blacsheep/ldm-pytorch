@@ -15,13 +15,13 @@ class Block(nn.Module):
             self.conv1 = nn.Conv2d(in_ch, out_ch, 3, padding=1)
             self.transform = nn.Conv2d(out_ch, out_ch, 4, 2, 1)
         self.conv2 = nn.Conv2d(out_ch, out_ch, 3, padding=1)
-        self.bnorm1 = nn.BatchNorm2d(out_ch)
-        self.bnorm2 = nn.BatchNorm2d(out_ch)
+        self.gnorm1 = nn.GroupNorm(32, out_ch)
+        self.gnorm2 = nn.GroupNorm(32, out_ch)
         self.relu = nn.ReLU()
 
     def forward(self, x, t, ):
         # First Conv
-        h = self.bnorm1(self.relu(self.conv1(x)))
+        h = self.gnorm1(self.relu(self.conv1(x)))
         # Time embedding
         time_emb = self.relu(self.time_mlp(t))
         # Extend last 2 dimensions
@@ -29,7 +29,7 @@ class Block(nn.Module):
         # Add time channel
         h = h + time_emb
         # Second Conv
-        h = self.bnorm2(self.relu(self.conv2(h)))
+        h = self.gnorm2(self.relu(self.conv2(h)))
         # Down or Upsample
         return self.transform(h)
 
@@ -46,7 +46,6 @@ class SinusoidalPositionEmbeddings(nn.Module):
         embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)
         embeddings = time[:, None] * embeddings[None, :]
         embeddings = torch.cat((embeddings.sin(), embeddings.cos()), dim=-1)
-        # TODO: Double check the ordering here
         return embeddings
 
 
@@ -57,10 +56,10 @@ class SimpleUnet(nn.Module):
 
     def __init__(self):
         super().__init__()
-        image_channels = 3
+        image_channels = 256
         down_channels = (64, 128, 256, 512, 1024)
         up_channels = (1024, 512, 256, 128, 64)
-        out_dim = 3
+        out_dim = 256
         time_emb_dim = 32
 
         # Time embedding

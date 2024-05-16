@@ -1,13 +1,8 @@
 import os
-
 import numpy as np
+import torch
 from torchvision import utils as vutils
 from tqdm import tqdm
-
-import sys
-
-sys.path.append("/home/lxia")
-
 from ldm.data.mscoco_dataloader import get_dataloader
 from ldm.loss.vqperceptual import VQLPIPSWithDiscriminator
 from ldm.model.ldm import *
@@ -75,7 +70,7 @@ class TrainVQ:
 
                     if i % 1000 == 0:
                         with torch.no_grad():
-                            real_fake_images = torch.cat((img[:4], decoded_img.add(1).mul(0.5)[:4]))
+                            real_fake_images = torch.cat((img[:4], decoded_img[:4]))
                             vutils.save_image(real_fake_images, os.path.join("results", f"{epoch}_{i}.jpg"), nrow=4)
 
                     pbar.set_postfix(
@@ -87,15 +82,15 @@ class TrainVQ:
 
 
 if __name__ == '__main__':
-    BATCH_SIZE = 4
+    BATCH_SIZE = 2
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    data_path = '/home/lxia/ldm/data/dataset/{00000..00059}.tar'
+    data_path = '/home/lxia/ldm/ldm/data/dataset/{00010..00014}.tar'
     dataloader = get_dataloader(data_path, batch_size=BATCH_SIZE)
 
-    num_residual = 2
-    vq = VQModel(n_e=4096, e_dim=256, beta=0.25, input_channel=256, num_res=num_residual)
-    num_epochs = 20
+    num_residual = 3
+    vq = VQModel(n_e=4096*2, e_dim=256, beta=0.25, input_channel=256, num_res=num_residual)
+    num_epochs = 15
     trainer = TrainVQ(vq=vq, dataloader=dataloader, num_epochs=num_epochs)
 
     trainer.train()

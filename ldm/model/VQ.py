@@ -9,9 +9,12 @@ class UpSampleBlock(nn.Module):
         self.conv = nn.Conv2d(channels, channels, 3, 1, 1)
 
     def forward(self, x):
-        x = F.interpolate(x, scale_factor=2.0)
+        x = F.interpolate(x, scale_factor=2.0, mode="nearest")
         return self.conv(x)
 
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
 
 class DownSampleBlock(nn.Module):
     def __init__(self, channels):
@@ -39,12 +42,12 @@ class Residual(nn.Module):
                                    kernel_size=1, stride=strides)
         else:
             self.conv3 = None
-        self.bn1 = nn.BatchNorm2d(num_channels)
-        self.bn2 = nn.BatchNorm2d(num_channels)
+        self.gn1 = Normalize(num_channels)
+        self.gn2 = Normalize(num_channels)
 
     def forward(self, X):
-        Y = F.relu(self.bn1(self.conv1(X)))
-        Y = self.bn2(self.conv2(Y))
+        Y = F.relu(self.gn1(self.conv1(X)))
+        Y = self.gn2((self.conv2(Y)))
         if self.conv3:
             X = self.conv3(X)
 
@@ -109,6 +112,7 @@ class Encoder(nn.Module):
         # end
         self.end = nn.ModuleList()
         self.end.append(Normalize(curr_output))
+        self.end.append(Swish())
         self.conv_out = torch.nn.Conv2d(curr_output, curr_output,
                                         kernel_size=3,
                                         stride=1,
@@ -149,6 +153,11 @@ class Decoder(nn.Module):
 
         # mid
         self.mid = nn.ModuleList()
+        conv_in = torch.nn.Conv2d(curr_output, curr_output,
+                                                          kernel_size=3,
+                                                          stride=1,
+                                                          padding=1)
+        self.mid.append(conv_in)
         self.mid.append(Residual(curr_output, curr_output))
         self.mid.append(SelfAttention(curr_output))
         self.mid.append(Residual(curr_output, curr_output))
@@ -176,14 +185,9 @@ class Decoder(nn.Module):
         # end
         self.end = nn.ModuleList()
         self.end.append(Normalize(curr_output))
-        self.conv_out = torch.nn.Conv2d(curr_output, curr_output,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+        self.end.append(Swish())
+        self.conv_out = nn.Conv2d(curr_output, 3, 3, 1, 1)
         self.end.append(self.conv_out)
-
-        self.rgb2input_channel = nn.Conv2d(curr_output, 3, 3, 1, 1)
-        self.end.append(self.rgb2input_channel)
 
     def forward(self, x):
         # mid -> upsampling -> end
@@ -277,14 +281,5 @@ class VQModel(nn.Module):
         return self.decoder.conv_out.weight
 
     def init_from_ckpt(self, path, ignore_keys=None):
-        if ignore_keys is None:
-            ignore_keys = list()
-        sd = torch.load(path, map_location="cpu")["state_dict"]
-        keys = list(sd.keys())
-        for k in keys:
-            for ik in ignore_keys:
-                if k.startswith(ik):
-                    print("Deleting key {} from state_dict.".format(k))
-                    del sd[k]
-        self.load_state_dict(sd, strict=False)
+        self.load_state_dict(torch.load(path))
         print(f"Restored from {path}")

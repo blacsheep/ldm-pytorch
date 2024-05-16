@@ -1,8 +1,11 @@
 from inspect import isfunction
 
 import torch
-from einops import rearrange
-from torch import nn
+from einops import rearrange, repeat
+from torch import nn, einsum
+import torch.nn.functional as F
+import math
+
 
 
 # https://github.com/CompVis/latent-diffusion/blob/main/ldm/modules/attention.py#L152
@@ -30,7 +33,7 @@ class CrossAttention(nn.Module):
             nn.Dropout(dropout)
         )
 
-    def forward(self, x, context=None, mask=None):
+    def forward(self, x, context=None):
         h = self.heads
 
         q = self.to_q(x)
@@ -40,14 +43,15 @@ class CrossAttention(nn.Module):
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
-        sim = torch.einsum('b i d, b j d -> b i j', q, k) * self.scale
+        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
 
         # attention, what we cannot get enough of
         attn = sim.softmax(dim=-1)
 
-        out = torch.einsum('b i j, b j d -> b i d', attn, v)
+        out = einsum('b i j, b j d -> b i d', attn, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
         return self.to_out(out)
+
 
 
 class SelfAttention(nn.Module):
